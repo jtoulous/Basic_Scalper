@@ -89,7 +89,7 @@ def BuildDb(crypto, interval, start_date):
     
     symbol = GetBinanceSymbol(crypto)
     yesterday = datetime.now() - timedelta(1)
-    file_path = f'CRYPTOS/{crypto}/{interval}/{crypto}_{interval}.csv'
+    file_path = f'crypto/{crypto}/{interval}/{crypto}_{interval}.csv'
     start_timestamp = int(pd.to_datetime(start_date, dayfirst=True).timestamp() * 1000)
     end_timestamp = int(yesterday.timestamp() * 1000)
     
@@ -109,7 +109,7 @@ def BuildDb(crypto, interval, start_date):
 def UpdateDb(crypto, interval):
     logging.info(f'{Style.BRIGHT}{Fore.GREEN}Updating {crypto} {interval} historical database.{Style.RESET_ALL}')
     
-    file_path = f'CRYPTOS/{crypto}/{interval}/{crypto}_{interval}.csv'
+    file_path = f'crypto/{crypto}/{interval}/{crypto}_{interval}.csv'
     dataframe = pd.read_csv(file_path)
     
     if not pd.api.types.is_datetime64_any_dtype(dataframe['timestamp']):
@@ -142,17 +142,17 @@ def UpdateDb(crypto, interval):
 def SplitDb(crypto, interval):
     logging.info(f'{Style.BRIGHT}{Fore.GREEN}Splitting {crypto} {interval} database into yearly files.{Style.RESET_ALL}')    
 
-    dataframe = pd.read_csv(f'CRYPTOS/{crypto}/{interval}/{crypto}_{interval}.csv')    
+    dataframe = pd.read_csv(f'crypto/{crypto}/{interval}/{crypto}_{interval}.csv')    
     if not pd.api.types.is_datetime64_any_dtype(dataframe['timestamp']):
         dataframe['timestamp'] = pd.to_datetime(dataframe['timestamp'])
     
     dataframe['year'] = dataframe['timestamp'].dt.year
     
-    output_dir = f'CRYPTOS/{crypto}/{interval}/raw'
+    output_dir = f'crypto/{crypto}/{interval}/raw'
     os.makedirs(output_dir, exist_ok=True)
     
     for year, group in dataframe.groupby('year'):
-        year_file_path = f'CRYPTOS/{crypto}/{interval}/raw/{year}.csv'
+        year_file_path = f'crypto/{crypto}/{interval}/raw/{year}.csv'
         group.drop(columns=['year'], inplace=True)
         group.to_csv(year_file_path, index=False)
         logging.info(f'{Style.BRIGHT}Year {year} data saved to {year_file_path}.{Style.RESET_ALL}')
@@ -161,7 +161,7 @@ def SplitDb(crypto, interval):
 
 
 def FilterDb(crypto, interval, file_name):
-    df = pd.read_csv(f'CRYPTOS/{crypto}/{interval}/{crypto}_{interval}.csv')
+    df = pd.read_csv(f'crypto/{crypto}/{interval}/{crypto}_{interval}.csv', usecols=["timestamp", "open", "close", "high", "low", "volume"])
     if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
         df['timestamp'] = pd.to_datetime(df['timestamp'])
     
@@ -171,7 +171,7 @@ def FilterDb(crypto, interval, file_name):
     while done != 1:
         for y, year in enumerate(years):
             print(f'\n{str(y)} - {str(year)}')
-        answer = input('Choose index of the year to include or \'done\': ')
+        answer = input('\nChoose index of the year to include or \'done\': ')
         
         if answer == 'done':
             done = 1
@@ -190,36 +190,33 @@ def FilterDb(crypto, interval, file_name):
 
     df_filtered = df[df['timestamp'].dt.year.isin(chosen_years_list)]
     
-    if os.path.exists(f'CRYPTOS/{crypto}/{interval}/{file_name}'):
-        os.remove(f'CRYPTOS/{crypto}/{interval}/{file_name}')
+    if os.path.exists(f'crypto/{crypto}/{interval}/{file_name}'):
+        os.remove(f'crypto/{crypto}/{interval}/{file_name}')
     
-    df_filtered.to_csv(f'CRYPTOS/{crypto}/{interval}/{file_name}', index=False)
+    df_filtered.to_csv(f'crypto/{crypto}/{interval}/{file_name}', index=False)
     logging.info(f'{Style.BRIGHT}{Fore.GREEN}File {file_name} created for {crypto} {interval}.{Style.RESET_ALL}')
 
 
 
-def CreateArch():
-    if not os.path.exists('CRYPTOS'):
-        os.makedirs('CRYPTOS')
+def CreateArch(timeframes):
+    if not os.path.exists('crypto'):
+        os.makedirs('crypto')
 
     for crypto in ActiveCryptos():
-        if not os.path.exists(f'CRYPTOS/{crypto}'):
-            os.makedirs(f'CRYPTOS/{crypto}')
+        if not os.path.exists(f'crypto/{crypto}'):
+            os.makedirs(f'crypto/{crypto}')
 
-            os.makedirs(f'CRYPTOS/{crypto}/1m')
-            os.makedirs(f'CRYPTOS/{crypto}/1m/raw')
+        for interval in timeframes:
+            if not os.path.exists(f'crypto/{crypto}/{interval}'):
+                os.makedirs(f'crypto/{crypto}/{interval}')
+            if not os.path.exists(f'crypto/{crypto}/{interval}/raw'):
+                os.makedirs(f'crypto/{crypto}/{interval}/raw')
 
-            os.makedirs(f'CRYPTOS/{crypto}/30m')
-            os.makedirs(f'CRYPTOS/{crypto}/30m/raw')
-
-            os.makedirs(f'CRYPTOS/{crypto}/1d')
-            os.makedirs(f'CRYPTOS/{crypto}/1d/raw')
 
 
 def CheckErrors(args):
-    if (args.update is True or args.split is True or args.filter is True) and not os.path.exists('CRYPTOS'):
-        raise Exception('Database is not built')
-
+    if (args.update is True or args.split is True or args.filter is True) and not os.path.exists('crypto'):
+        raise Exception('Database is not built, run \'-build\' first')
 
 
 
@@ -239,10 +236,10 @@ if __name__ == '__main__':
             'LTC-USD': '07/12/2013',
             'BCH-USD': '01/08/2017',
             'NEAR-USD': '24/08/2020',
+            'AAVE-USD': '16/10/2020'
         }
         CheckErrors(args)
-        CreateArch()
-
+        CreateArch(args.timeframes)
         for crypto in args.crypto:
             start_date = cryptos_starting_dates[crypto]
             for interval in args.timeframes:
@@ -259,11 +256,11 @@ if __name__ == '__main__':
                     FilterDb(crypto, interval, args.filter)
 
                 if args.delete is True:
-                    if os.path.exists('CRYPTOS'):
-                        shutil.rmtree('CRYPTOS')
+                    if os.path.exists('crypto'):
+                        shutil.rmtree('crypto')
                     logging.info(f'Databases deleted.')
                     exit(0)
                     
 
     except Exception as error:
-        print('Error: ' + error + ' moverfuker')
+        print(f'Error:  + {error} +  moverfuker')

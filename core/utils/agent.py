@@ -4,6 +4,7 @@ import joblib
 import logging
 
 from sklearn.pipeline import Pipeline
+from sklearn.neural_network import MLPClassifier
 
 from utils.indicators import RSI, BLG
 from utils.transformers import Labeler, Scaler, BalancedOverSampler
@@ -16,17 +17,24 @@ class Agent():
         self.models = {}
 
         if load is False:
-            self.models['XGB'] = xgb.XGBClassifier(
-                objective='binary:logistic',
-                eval_metric='logloss',
-                use_label_encoder=False
+            self.models['MLP_Balanced'] = MLPClassifier(      #Model trained on balanced data
+                hidden_layer_sizes=(64, 32),
+                activation='relu',
+                solver='adam',
+                alpha=0.001,
+                batch_size=32,
+                learning_rate='adaptive',
+                max_iter=200,
+                random_state=42
             )
 
+
+
         else:
-            self.models['XGB'] = joblib.load(f'data/agents/{crypto}_agent.pkl')
+            self.models['MLP_Balanced'] = joblib.load(f'data/agents/{crypto}_agent.pkl')
 
 
-    def train(self, dataframe, crypto, crossval=False):
+    def train(self, dataframe, crypto, crossval=False):#Fine tuner le modele sur les 3-4 dernieres annees a la fin
             features = ['RSI14', 'U-BAND', 'L-BAND']
             preprocess = Pipeline([
                 ('RSI', RSI(14)),
@@ -45,10 +53,11 @@ class Agent():
 
             X, y = dataframe[features], dataframe['LABEL']
             if crossval is True:
-                CrossVal(self.models['XGB'], X, y)
+                CrossVal(self.models['MLP_Balanced'], X, y)
 
+            breakpoint()
             logging.info(f'Training...')
-            self.models['XGB'].fit(X, y)
+            self.models['MLP_Balanced'].fit(X, y)
             logging.info(f'Training done')
 
 

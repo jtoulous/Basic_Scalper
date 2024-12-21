@@ -17,18 +17,3 @@ def ReadDf(csv_file):
     if not pd.api.types.is_datetime64_any_dtype(df['DATETIME']):
         df['DATETIME'] = pd.to_datetime(df['DATETIME'])
     return df
-
-
-def CleanDf(df):
-    df.reset_index(inplace=True)
-    df = df.drop(columns=['Adj Close'])
-    df.rename(columns={
-        'Date': 'DATETIME',
-        'Open': 'OPEN',
-        'High': 'HIGH',
-        'Low': 'LOW',
-        'Close': 'CLOSE',
-        'Volume': 'VOLUME'
-    }, inplace=True)
-    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
-    return df
