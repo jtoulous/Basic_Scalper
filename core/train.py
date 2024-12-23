@@ -25,16 +25,16 @@ if __name__ == '__main__':
 #            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_1m.csv')
             dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_20-24.csv')
             
-            dataframe = dataframe[(dataframe['DATETIME'] >= '2020-01-01') & (dataframe['DATETIME'] <= '2024-12-10')]
-            dataframe = dataframe.reset_index(drop=True)
+#            dataframe = dataframe[(dataframe['DATETIME'] >= '2020-01-01') & (dataframe['DATETIME'] <= '2024-12-10')]
+#            dataframe = dataframe.reset_index(drop=True)
 
             logging.info(f'Training {crypto} agent')
-            agent.train(dataframe.copy(), crypto, args.crossval)
+            agent.train(dataframe.copy(), args.crossval)
             logging.info(f'Agent {crypto} trained successfully')
 
-#            logging.info("Saving agent")
-#            agent.save(X, y)
-#            logging.info(f'Agent {crypto} saved successfully')
+            logging.info("Saving agent")
+            agent.save(X, y)
+            logging.info(f'Agent {crypto} saved successfully')
 
     except Exception as error:
         logging.error("Error: %s", error, exc_info=True)

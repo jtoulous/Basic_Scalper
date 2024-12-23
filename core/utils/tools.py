@@ -36,3 +36,11 @@ def TimeSeriesSplitValidation(X, y, models):
         xgb_mse = np.mean(xgb_mse_scores)
         xgb_r2 = np.mean(xgb_r2_scores)
         logging.info(f"XGB - Cross-validation MSE: {xgb_mse}, R²: {xgb_r2}")
+
+def TakeProfit(X, profit):
+    take_profit = X['CLOSE'] * (1 + profit)
+    return take_profit
+
+def StopLoss(X, risk):
+    stop_loss = X['CLOSE'] * (1 - risk)
+    return stop_loss

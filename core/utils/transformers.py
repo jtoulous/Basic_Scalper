@@ -31,6 +31,7 @@ class   Scaler(BaseEstimator, TransformerMixin):
         self.crypto = crypto
         self.action = action
         self.opt = opt
+        self.scaler = StandardScaler() if action == 'train' else joblib.load(f'data/agents/scalers/{self.crypto}_scaler.pkl')
 
     def fit(self, X, y=None):
         return self
@@ -39,16 +40,14 @@ class   Scaler(BaseEstimator, TransformerMixin):
         logging.info("Scaling...")
         if self.action == 'train':
             X_scaled = X[self.columns]
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X_scaled)
+            X_scaled = self.scaler.fit_transform(X_scaled)
             X[self.columns] = X_scaled
             if self.opt != 'no save':
-                joblib.dump(scaler, f'data/agents/scalers/{self.crypto}_scaler.pkl')
+                joblib.dump(self.scaler, f'data/agents/scalers/{self.crypto}_scaler.pkl')
 
         elif self.action == 'predict':
-            scaler = joblib.load(f'data/agents/scalers/{self.crypto}_scaler.pkl')
             X_scaled = X[self.columns]
-            X_scaled = scaler.transform(X_scaled)
+            X_scaled = self.scaler.transform(X_scaled)
             X[self.columns] = X_scaled
         
         logging.info("Scaling successful")
@@ -141,10 +140,10 @@ class Labeler(BaseEstimator, TransformerMixin):   # 0 for Win, 1 for Lose
         X = X.sort_values(by='DATETIME')
 
         for idx in range(1, len(X)):
-            stop_loss = X['OPEN'].iloc[idx] * (1 - self.risk)
+            stop_loss = X['CLOSE'].iloc[idx] * (1 - self.risk)
             take_profit = X['CLOSE'].iloc[idx] * (1 + self.profit)
             end_idx = min(idx + self.lifespan, len(X))
-            for j in range(idx, end_idx):
+            for j in range(idx + 1, end_idx):
                 open_price = X['OPEN'].iloc[j]
                 close_price = X['CLOSE'].iloc[j]
 

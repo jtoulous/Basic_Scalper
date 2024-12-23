@@ -28,35 +28,6 @@ def Parsing():
     return parser.parse_args()
 
 
-def GetBinanceSymbol(crypto):
-    if crypto == 'BTC-USD':
-        return 'BTCUSDT'
-    elif crypto == 'ETH-USD':
-        return 'ETHUSDT'
-    elif crypto == 'SOL-USD':
-        return 'SOLUSDT'
-    elif crypto == 'BNB-USD':
-        return 'BNBUSDT'
-    elif crypto == 'ADA-USD':
-        return 'ADAUSDT'
-    elif crypto == 'AVAX-USD':
-        return 'AVAXUSDT'
-    elif crypto == 'DOGE-USD':
-        return 'DOGEUSDT'
-    elif crypto == 'DOT-USD':
-        return 'DOTUSDT'
-    elif crypto == 'XRP-USD':
-        return 'XRPUSDT'
-    elif crypto == 'LTC-USD':
-        return 'LTCUSDT'
-    elif crypto == 'BCH-USD':
-        return 'BCHUSDT'
-    elif crypto == 'NEAR-USD':
-        return 'NEARUSDT'
-    elif crypto == 'AAVE-USD':
-        return 'AAVEUSDT'
-
-
 def AppendToCsv(data, file_path):
     columns = ["timestamp", "open", "high", "low", "close", "volume", "close_time", "quote_asset_volume", 
                "number_of_trades", "taker_buy_base_asset_volume", "taker_buy_quote_asset_volume", "ignore"]
@@ -87,14 +58,13 @@ def FetchHistoricalData(symbol, interval, start_time):
 def BuildDb(crypto, interval, start_date):
     logging.info(f'{Style.BRIGHT}Building {crypto} {interval} historical database.{Style.RESET_ALL}')
     
-    symbol = GetBinanceSymbol(crypto)
     yesterday = datetime.now() - timedelta(1)
     file_path = f'crypto/{crypto}/{interval}/{crypto}_{interval}.csv'
     start_timestamp = int(pd.to_datetime(start_date, dayfirst=True).timestamp() * 1000)
     end_timestamp = int(yesterday.timestamp() * 1000)
     
     while start_timestamp <= end_timestamp:
-        historical_data = FetchHistoricalData(symbol, interval, start_timestamp)
+        historical_data = FetchHistoricalData(crypto, interval, start_timestamp)
         if historical_data:
             AppendToCsv(historical_data, file_path)
             start_timestamp = historical_data[-1][0] + 1
@@ -116,14 +86,13 @@ def UpdateDb(crypto, interval):
         dataframe['timestamp'] = pd.to_datetime(dataframe['timestamp'])
     
     last_timestamp = int(dataframe.iloc[-2]['timestamp'].timestamp() * 1000)
-    symbol = GetBinanceSymbol(crypto)
     now = datetime.now()
     end_timestamp = int(now.timestamp() * 1000)
     
     logging.info(f'Fetching data from {datetime.utcfromtimestamp(last_timestamp / 1000).strftime("%Y-%m-%d %H:%M:%S")} to now.')
     new_data = []
     while last_timestamp <= end_timestamp:
-        historical_data = FetchHistoricalData(symbol, interval, last_timestamp)
+        historical_data = FetchHistoricalData(crypto, interval, last_timestamp)
         if historical_data:
             new_data.extend(historical_data)
             last_timestamp = historical_data[-1][0] + 1
@@ -224,19 +193,19 @@ if __name__ == '__main__':
     try:
         args = Parsing()
         cryptos_starting_dates = {
-            'BTC-USD': '17/08/2017',
-            'ETH-USD': '07/08/2015',
-            'SOL-USD': '11/04/2020',
-            'BNB-USD': '25/07/2017',
-            'ADA-USD': '01/10/2017',
-            'AVAX-USD': '21/09/2020',
-            'DOGE-USD': '19/12/2013',
-            'DOT-USD': '18/08/2020',
-            'XRP-USD': '02/08/2013',
-            'LTC-USD': '07/12/2013',
-            'BCH-USD': '01/08/2017',
-            'NEAR-USD': '24/08/2020',
-            'AAVE-USD': '16/10/2020'
+            'BTCUSDT': '17/08/2017',
+            'ETHUSDT': '07/08/2015',
+            'SOLUSDT': '11/04/2020',
+            'BNBUSDT': '25/07/2017',
+            'ADAUSDT': '01/10/2017',
+            'AVAXUSDT': '21/09/2020',
+            'DOGEUSDT': '19/12/2013',
+            'DOTUSDT': '18/08/2020',
+            'XRPUSDT': '02/08/2013',
+            'LTCUSDT': '07/12/2013',
+            'BCHUSDT': '01/08/2017',
+            'NEARUSDT': '24/08/2020',
+            'AAVEUSDT': '16/10/2020'
         }
         CheckErrors(args)
         CreateArch(args.timeframes)

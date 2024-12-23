@@ -3,19 +3,14 @@ import pandas as pd
 
 def ActiveCryptos():
     active_cryptos = [
-        'BTC-USD',
-        'ETH-USD',
-        'SOL-USD',
-        'BNB-USD',
-        'ADA-USD',
-        'AVAX-USD',
-        'DOGE-USD',
-        'DOT-USD',
-        'XRP-USD',
-        'LTC-USD',
-        'BCH-USD',
-        'NEAR-USD',
-        'AAVE-USD',
+        'BTCUSDT',
+        'ETHUSDT',
+        'SOLUSDT',
+        'BNBUSDT',
+        'ADAUSDT',
+        'DOGEUSDT',
+        'XRPUSDT',
+        'LTCUSDT',
     ]
     return active_cryptos
 
@@ -245,30 +240,3 @@ def UpdateArgs(args, crypto):
     args.risk = GetRP(crypto, 'R')
     args.profit = GetRP(crypto, 'P')
     return args
-
-
-def TranslateCryptoName(crypto):
-    if crypto == 'BTC-USD':
-        return 'BTCUSDC'
-    elif crypto == 'ETH-USD':
-        return 'ETHUSDC'
-    elif crypto == 'SOL-USD':
-        return 'SOLUSDC'
-    elif crypto == 'BNB-USD':
-        return 'BNBUSDC'
-    elif crypto == 'ADA-USD':
-        return 'ADAUSDC'
-    elif crypto == 'AVAX-USD':
-        return 'AVAXUSDC'
-    elif crypto == 'DOGE-USD':
-        return 'DOGEUSDC'
-    elif crypto == 'DOT-USD':
-        return 'DOTUSDC'
-    elif crypto == 'XRP-USD':
-        return 'XRPUSDC'   
-    elif crypto == 'LTC-USD':
-        return 'LTCUSDC'
-    elif crypto == 'BCH-USD':
-        return 'BCHUSDC'
-    elif crypto == 'NEAR-USD':
-        return 'NEARUSDC'
