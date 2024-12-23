@@ -167,11 +167,11 @@ def FilterDb(crypto, interval, file_name):
 
 
 
-def CreateArch(timeframes):
+def CreateArch(timeframes, crypto_list):
     if not os.path.exists('crypto'):
         os.makedirs('crypto')
 
-    for crypto in ActiveCryptos():
+    for crypto in crypto_list:
         if not os.path.exists(f'crypto/{crypto}'):
             os.makedirs(f'crypto/{crypto}')
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
             'AAVEUSDT': '16/10/2020'
         }
         CheckErrors(args)
-        CreateArch(args.timeframes)
+        CreateArch(args.timeframes, args.crypto)
         for crypto in args.crypto:
             start_date = cryptos_starting_dates[crypto]
             for interval in args.timeframes:

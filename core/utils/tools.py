@@ -9,7 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from utils.log import printLog
 
 
-def CrossVal(model, X, y, cv=5):
+def CrossVal(model, X, y, cv=1):
     printLog(' ===> Cross validation...')
     scores = cross_val_score(model, X, y, cv=cv)
     printLog(f'   ==> Cross-Validation Scores: {scores}')
@@ -37,9 +37,11 @@ def TimeSeriesSplitValidation(X, y, models):
         xgb_r2 = np.mean(xgb_r2_scores)
         logging.info(f"XGB - Cross-validation MSE: {xgb_mse}, R²: {xgb_r2}")
 
+
 def TakeProfit(X, profit):
     take_profit = X['CLOSE'] * (1 + profit)
     return take_profit
+
 
 def StopLoss(X, risk):
     stop_loss = X['CLOSE'] * (1 - risk)

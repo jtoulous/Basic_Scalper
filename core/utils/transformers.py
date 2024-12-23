@@ -137,11 +137,14 @@ class Labeler(BaseEstimator, TransformerMixin):   # 0 for Win, 1 for Lose
     def transform(self, X, y=None):
         logging.info("Labelling...")
         X['LABEL'] = 1
+#        X['TAKE_PROFIT'] = X['CLOSE'] * (1 + self.profit)
+#        X['STOP_LOSS'] = X['CLOSE'] * (1 - self.risk)
         X = X.sort_values(by='DATETIME')
 
         for idx in range(1, len(X)):
             stop_loss = X['CLOSE'].iloc[idx] * (1 - self.risk)
             take_profit = X['CLOSE'].iloc[idx] * (1 + self.profit)
+
             end_idx = min(idx + self.lifespan, len(X))
             for j in range(idx + 1, end_idx):
                 open_price = X['OPEN'].iloc[j]
