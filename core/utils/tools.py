@@ -9,7 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from utils.log import printLog
 
 
-def CrossVal(model, X, y, cv=1):
+def CrossVal(model, X, y, cv=5):
     printLog(' ===> Cross validation...')
     scores = cross_val_score(model, X, y, cv=cv)
     printLog(f'   ==> Cross-Validation Scores: {scores}')
