@@ -48,13 +48,10 @@ class Agent():
             dataframe = dataframe.reset_index(drop=True)
             logging.info("Preprocessing completed")
 
-            breakpoint()
-
             X, y = dataframe[self.features], dataframe['LABEL']
             if crossval is True:
                 CrossVal(self.models['MLP_Balanced'], X, y)
 
-            breakpoint()
             logging.info(f'Training...')
             self.models['MLP_Balanced'].fit(X, y)
             logging.info(f'Training done')
