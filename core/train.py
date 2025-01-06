@@ -1,5 +1,6 @@
 import argparse
 import logging
+import pandas as pd
 
 from utils.agent import Agent
 from utils.dataframe import ReadDf
@@ -23,7 +24,8 @@ if __name__ == '__main__':
         for crypto in ActiveCryptos():
             agent = Agent(crypto)
 #            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_1m.csv')
-            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_20-24.csv')
+#            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_23-24.csv')
+            dataframe = pd.read_csv(f'data/crypto/{crypto}/1m/{crypto}_preprocessed.csv')
             
 #            dataframe = dataframe[(dataframe['DATETIME'] >= '2020-01-01') & (dataframe['DATETIME'] <= '2024-12-10')]
 #            dataframe = dataframe.reset_index(drop=True)

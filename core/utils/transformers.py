@@ -69,7 +69,6 @@ class   RowSelector(BaseEstimator, TransformerMixin):
 class   BalancedOverSampler(BaseEstimator, TransformerMixin):
     def __init__(self, classes):
         self.classes = classes
-        pass
 
     def fit(self, X, y=None):
         self.class_counts = {cls: (X['LABEL'] == cls).sum() for cls in self.classes}
@@ -84,10 +83,44 @@ class   BalancedOverSampler(BaseEstimator, TransformerMixin):
                 nb_duplicatas = self.max_count - value
                 duplicatas_df = target_tmp_df.sample(n=nb_duplicatas, replace=True).reset_index(drop=True)
                 X = pd.concat([X, duplicatas_df], ignore_index=True)
-        X = X.sort_values(by='DATETIME')
         X = X.sample(frac=1).reset_index(drop=True)
         logging.info("Over sampling successful")
         return X
+
+    def fit_transform(self, X, y=None):
+        self.fit(X, y)
+        return self.transform(X, y)
+
+
+class UnbalancedSampler(BaseEstimator, TransformerMixin):
+    def __init__(self, classes, target, minority, percentage):
+        self.classes = classes
+        self.target = target
+        self.minority = minority
+        self.unbalance_percentage = percentage
+
+    def fit(self, X, y=None):
+        counts = X['LABEL'].value_counts()
+        self.class_counts = {}
+        for label in self.classes:
+            self.class_counts[label] = counts.get(label, 0)
+        self.target_objectif = int(self.class_counts[self.minority] * self.unbalance_percentage)
+        return self
+
+    def transform(self, X, y=None):
+        logging.info(f'Unbalanced over sampling {self.target}...')
+        if self.class_counts[self.target] < self.target_objectif:
+            target_tmp_df = X[X['LABEL'] == self.target]
+            nb_duplicatas = self.target_objectif - self.class_counts[self.target]
+            duplicatas_df = target_tmp_df.sample(n=nb_duplicatas, replace=True).reset_index(drop=True)
+            X = pd.concat([X, duplicatas_df], ignore_index=True)
+        X.sample(frac=1).reset_index(drop=True)
+        logging.info(f'Unbalanced over sampling {self.target} successful')
+        return X
+
+    def fit_transform(self, X, y=None):
+        self.fit(X, y)
+        return self.transform(X, y)
 
 
 class BinSampler(BaseEstimator, TransformerMixin):
