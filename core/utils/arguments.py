@@ -4,13 +4,13 @@ import pandas as pd
 def ActiveCryptos():
     active_cryptos = [
         'BTCUSDT',
-        'ETHUSDT',
-        'SOLUSDT',
-        'BNBUSDT',
-        'ADAUSDT',
-        'DOGEUSDT',
-        'XRPUSDT',
-        'LTCUSDT',
+#        'ETHUSDT',
+#        'SOLUSDT',
+#        'BNBUSDT',
+#        'ADAUSDT',
+#        'DOGEUSDT',
+#        'XRPUSDT',
+#        'LTCUSDT',
     ]
     return active_cryptos
 

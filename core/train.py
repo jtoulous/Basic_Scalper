@@ -22,16 +22,17 @@ if __name__ == '__main__':
         args = Parsing()
 
         for crypto in ActiveCryptos():
-            agent = Agent(crypto)
+            agent = Agent(crypto, crossval=args.crossval)
 #            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_1m.csv')
-#            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_23-24.csv')
-            dataframe = pd.read_csv(f'data/crypto/{crypto}/1m/{crypto}_preprocessed.csv')
+            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_23-24.csv')
+#            dataframe = pd.read_csv(f'data/crypto/{crypto}/1m/{crypto}_preprocessed.csv')
             
 #            dataframe = dataframe[(dataframe['DATETIME'] >= '2020-01-01') & (dataframe['DATETIME'] <= '2024-12-10')]
 #            dataframe = dataframe.reset_index(drop=True)
-
+            dataframe = dataframe[len(dataframe) - 5000:].reset_index(drop=True)
+            
             logging.info(f'Training {crypto} agent')
-            agent.train(dataframe.copy(), args.crossval)
+            agent.train(dataframe.copy())
             logging.info(f'Agent {crypto} trained successfully')
 
             logging.info("Saving agent")

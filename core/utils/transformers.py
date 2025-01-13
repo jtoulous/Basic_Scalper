@@ -109,12 +109,13 @@ class UnbalancedSampler(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         logging.info(f'Unbalanced over sampling {self.target}...')
+#        breakpoint()
         if self.class_counts[self.target] < self.target_objectif:
             target_tmp_df = X[X['LABEL'] == self.target]
             nb_duplicatas = self.target_objectif - self.class_counts[self.target]
             duplicatas_df = target_tmp_df.sample(n=nb_duplicatas, replace=True).reset_index(drop=True)
             X = pd.concat([X, duplicatas_df], ignore_index=True)
-        X.sample(frac=1).reset_index(drop=True)
+        X = X.sample(frac=1).reset_index(drop=True)
         logging.info(f'Unbalanced over sampling {self.target} successful')
         return X
 
