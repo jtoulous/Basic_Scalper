@@ -38,7 +38,7 @@ def LoadAgents():
 
 def InitDataset(crypto):
     timeframe = '1m'
-    oldest_timestamp = datetime.now() - timedelta(minutes=100)
+    oldest_timestamp = datetime.now() - timedelta(minutes=21)
     newest_timestamp = datetime.now()
 
     raw_data = DownloadData(crypto, timeframe=timeframe, interval=[oldest_timestamp, newest_timestamp], limit=100)
@@ -64,22 +64,31 @@ if __name__ == '__main__':
 #        agents = LoadAgents()
         datasets = {}
 
+
+        preprocess = Pipeline([
+            ('RSI', RSI(14)),
+            ('BLG', BLG(20, 2)),
+        ])   ### FAIRE LE SCALING JUSTE AVANT LA PREDICTION
+
+
         for crypto in ActiveCryptos():
-            datasets[f'{crypto}'] = InitDataset(crypto)
-        breakpoint()
+            datasets[crypto] = InitDataset(crypto)
         last_entry = datasets['BTCUSDT'].iloc[-1]['DATETIME']
+
         while True:
             if last_entry.minute != datetime.now().minute:
                 for crypto in ActiveCryptos():
-#                    take_profit = TakeProfit(X, args.tp)
-#                    stop_loss = StopLoss(X, args.sl)
+                    datasets[crypto] = UpdateDataset(crypto, datasets[crypto])
+                    X = preprocess.transform(datasets[crypto].copy())
+                    X = X.iloc[-1]
+                    prediction = agent[crypto].predict(X)
+                    if prediction == 0:
+                        take_profit = TakeProfit(X, args.tp)
+                        stop_loss = StopLoss(X, args.sl)
 #
-#                    prediction = agent[crypto].predict(X)
-#                    if prediction == 0: # 0 = Win 
-#                        Market_trade(crypto, args.risk, stop_loss)  #to do, mettre une protec si il y a plus de capital dispo
-#                        OCO_trade(crypto, args.risk, take_profit, stop_loss)#to do
-#                
-#                last_datetime = datetime.now()
+                        Market_trade(crypto, args.risk, stop_loss)  #to do, mettre une protec si il y a plus de capital dispo
+                        OCO_trade(crypto, args.risk, take_profit, stop_loss)#to do
+                last_entry = datetime.now()
 
     except Exception as error:
         print(error)
