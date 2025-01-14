@@ -276,22 +276,38 @@ class DMI(BaseEstimator, TransformerMixin):
 
 
 class BLG(BaseEstimator, TransformerMixin):
-    def __init__(self, periods, num_std_dev):
+    def __init__(self, periods, num_std_dev, live=False):
         self.periods = periods
         self.num_std_dev = num_std_dev
+        self.live = live
+
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        TMP_SMA = X['CLOSE'].rolling(window=self.periods, min_periods=1).mean()
-        TMP_STD = X['CLOSE'].rolling(window=self.periods, min_periods=1).std()
-        u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
-        l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
+        if self.live is False:
+            TMP_SMA = X['CLOSE'].rolling(window=self.periods, min_periods=1).mean()
+            TMP_STD = X['CLOSE'].rolling(window=self.periods, min_periods=1).std()
+            u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
+            l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
 
-        X['U-BAND'] = u_band.bfill().ffill()
-        X['L-BAND'] = l_band.bfill().ffill()
-        X['BLG_WIDTH'] = (X['U-BAND'] - X['L-BAND'])
+            X['U-BAND'] = u_band.bfill().ffill()
+            X['L-BAND'] = l_band.bfill().ffill()
+            X['BLG_WIDTH'] = (X['U-BAND'] - X['L-BAND'])
+
+        else:
+            for i in range(1, len(X)):
+                if pd.isna(X.loc[i, 'U-BAND']) or pd.isna(X.loc[i, 'L-BAND']):
+                    TMP_SMA = X['CLOSE'].iloc[max(i - self.periods + 1, 0):i+1].mean()
+                    TMP_STD = X['CLOSE'].iloc[max(i - self.periods + 1, 0):i+1].std()
+                    u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
+                    l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
+
+                    X.loc[i, 'U-BAND'] = u_band
+                    X.loc[i, 'L-BAND'] = l_band
+                    X.loc[i, 'BLG_WIDTH'] = u_band - l_band
+
         return X
 
 

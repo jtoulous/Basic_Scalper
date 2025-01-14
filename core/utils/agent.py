@@ -102,7 +102,7 @@ class Agent():
             dataframe = preprocess.transform(dataframe)
             X = dataframe[self.features]
 
-            prediction = self.models['RF_Balanced'].predict(X)
+            prediction = self.models['MLP_Balanced'].predict(X)
             return prediction
 
 
@@ -115,7 +115,7 @@ class Agent():
 
         if self.crossval is True:
             logging.info(f'crossval balanced...')
-            CrossVal(self.models['RF_Balanced'], X, y)
+            CrossVal(self.models['MLP_Balanced'], X, y)
         self.models['MLP_Balanced'].fit(X, y)
 
 

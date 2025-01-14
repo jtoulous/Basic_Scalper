@@ -55,17 +55,14 @@ from utils.log import printLog
 
 
 
-
-
-
-def DownloadData(crypto, timeframe, datetime=None, interval=None, limit=1):
+def DownloadData(crypto, timeframe, timestamp=None, interval=None, limit=100):
     url = "https://api.binance.com/api/v1/klines"
-    if datetime is not None:
-        start_time = int(datetime.timestamp() * 1000)
+    if timestamp is not None:
+        start_time = int(timestamp.timestamp() * 1000)
         params = {
             "symbol": crypto,
             "interval": timeframe,
-            "startTime": datetime,
+            "startTime": start_time,
             "limit": limit
         }
         response = requests.get(url, params=params)
@@ -75,15 +72,21 @@ def DownloadData(crypto, timeframe, datetime=None, interval=None, limit=1):
             print(f"Erreur API: {response.status_code} - {response.text}")
             return None
     
-    else:
-        start_datetime = int(interval[0].timestamp() * 1000)
-        end_datetime = int(interval[1].timestamp() * 1000)
+    elif interval is not None:
+#        start_timestamp = interval[0].to_pydatetime()
+#        end_timestamp = interval[1].to_pydatetime()
+
+        start_timestamp = int(interval[0].timestamp() * 1000)
+        end_timestamp = int(interval[1].timestamp() * 1000)
+
+#        start_timestamp = int(interval[0].value / 1e6)
+#        end_timestamp = int(interval[1].value / 1e6)
 
         params = {
             "symbol": crypto,
             "interval": timeframe,
-            "startTime": start_datetime,
-            "endTime": end_datetime,
+            "startTime": start_timestamp,
+            "endTime": end_timestamp,
             "limit": limit
         }
         response = requests.get(url, params=params)
