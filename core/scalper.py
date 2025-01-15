@@ -86,10 +86,14 @@ def UpdateDataset(crypto, dataset, preprocess):
     update_df['CLOSE'] = update_df['CLOSE'].astype(float)
     update_df['VOLUME'] = update_df['VOLUME'].astype(float)
 
+
+    breakpoint()
     #ICI
-    missing_columns = set(dataset.columns) - set(update_df.columns)
-    for col in missing_columns:
-        update_df[col] = pd.NA
+#    missing_columns = set(dataset.columns) - set(update_df.columns)
+#    for col in missing_columns:
+#        update_df[col] = pd.NA
+
+    breakpoint()
 
     dataset = dataset.drop(dataset.tail(1).index)
     combined_df = pd.concat([dataset, update_df]).drop_duplicates(subset=['DATETIME'], keep='last')
