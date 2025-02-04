@@ -19,7 +19,7 @@ class Agent():
         self.crypto = crypto
         self.crossval = crossval
         self.models = {}
-        self.scaler = Scaler(self.features, self.crypto, 'train') if load is False else Scaler(self.features, self.crypto, 'predict')
+        self.scaler = Scaler(self.features, action='init', path=f'data/agents/scalers/{crypto}_scaler.pkl') if load is False else Scaler(self.features, action='load', path=f'data/agents/scalers/{crypto}_scaler.pkl')
 
         if load is False:
             self.models['MLP_Balanced'] = MLPClassifier(
@@ -67,16 +67,15 @@ class Agent():
             ('BLG', BLG(20, 2)),
             ('Labeler', Labeler(risk=0.001, profit=0.002, lifespan=10)),
             ('Scaler', self.scaler),
-#            ('Gan', GAN())
         ])
 
         logging.info(f'Starting {self.crypto} preprocessing')
         dataframe = preprocess.fit_transform(dataframe)
         logging.info("Preprocessing completed")
 
-        self.train_balanced(dataframe)
-        self.train_unbalanced(dataframe, 0)
-        self.train_unbalanced(dataframe, 1)
+        self.train_balanced(dataframe.copy())
+        self.train_unbalanced(dataframe.copy(), 0)
+        self.train_unbalanced(dataframe.copy(), 1)
 
         df_master = self.combine_predictions(dataframe[self.features])
         df_master['LABEL'] = dataframe['LABEL']
@@ -86,24 +85,11 @@ class Agent():
         y_master = dataframe['LABEL']
         if self.crossval is True:
             logging.info(f'crossval Master...')
-            CrossVal(self.models['RF_Master'], X_master, y_master)
+            CrossVal(self.models['MLP_Master'], X_master, y_master)
 
         logging.info(f'Training Master...')
         self.models['MLP_Master'].fit(X_master, y_master)
         logging.info(f'Training successful')
-
-
-    def predict(self, dataframe):
-            preprocess = Pipeline([
-                ('RSI', RSI(14)),
-                ('BLG', BLG(20, 2)),
-                ('Scaler', self.scaler),
-            ])
-            dataframe = preprocess.transform(dataframe)
-            X = dataframe[self.features]
-
-            prediction = self.models['MLP_Balanced'].predict(X)
-            return prediction
 
 
     def train_balanced(self, dataframe):
@@ -132,6 +118,33 @@ class Agent():
             logging.info(f'crossval unbalanced {b_type}...')
             CrossVal(self.models[f'MLP_Unbalanced_{b_type}'], X, y)
         self.models[f'MLP_Unbalanced_{b_type}'].fit(X, y)
+
+
+
+    def predict(self, dataframe):
+            preprocess = Pipeline([
+                ('RSI', RSI(14)),
+                ('BLG', BLG(20, 2)),
+                ('Scaler', self.scaler),
+            ])
+            dataframe = preprocess.transform(dataframe)
+            X = dataframe[self.features]
+
+            prediction = self.models['MLP_Balanced'].predict(X)
+            return prediction
+
+
+
+
+    def predict_validate(self, dataframe):
+        preprocess = Pipeline([
+            ('RSI', RSI(14)),
+            ('BLG', BLG(20, 2)),
+            ('Scaler', self.scaler),
+        ])
+        dataframe
+
+
 
 
     def combine_predictions(self, X):

@@ -26,30 +26,32 @@ class   Cleaner(BaseEstimator, TransformerMixin):
 
 
 class   Scaler(BaseEstimator, TransformerMixin):
-    def __init__(self, columns, crypto, action, opt=None):
+    def __init__(self, columns, action='init', path=None):
         self.columns = columns
-        self.crypto = crypto
         self.action = action
-        self.opt = opt
-        self.scaler = StandardScaler() if action == 'train' else joblib.load(f'data/agents/scalers/{self.crypto}_scaler.pkl')
+        self.path = path
+        self.inited = 0 if action == 'init' else 1
+        self.scaler = StandardScaler() if action == 'init' else joblib.load(path)
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
         logging.info("Scaling...")
-        if self.action == 'train':
-            X_scaled = X[self.columns]
-            X_scaled = self.scaler.fit_transform(X_scaled)
-            X[self.columns] = X_scaled
-            if self.opt != 'no save':
-                joblib.dump(self.scaler, f'data/agents/scalers/{self.crypto}_scaler.pkl')
 
-        elif self.action == 'predict':
-            X_scaled = X[self.columns]
-            X_scaled = self.scaler.transform(X_scaled)
-            X[self.columns] = X_scaled
+        X_scaled = X[self.columns]
         
+        if self.inited == 0 and self.action == 'init':
+            X_scaled = self.scaler.fit_transform(X_scaled)
+            self.inited = 1
+        else:
+            X_scaled = self.scaler.transform(X_scaled)
+        
+        X[self.columns] = X_scaled
+        
+        if self.action == 'init' and self.path is not None:
+            joblib.dump(self.scaler, self.path)
+
         logging.info("Scaling successful")
         return X
 

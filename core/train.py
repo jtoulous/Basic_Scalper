@@ -36,7 +36,7 @@ if __name__ == '__main__':
             logging.info(f'Agent {crypto} trained successfully')
 
             logging.info("Saving agent")
-            agent.save(X, y)
+            agent.save()
             logging.info(f'Agent {crypto} saved successfully')
 
     except Exception as error:
