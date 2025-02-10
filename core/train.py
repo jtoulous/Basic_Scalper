@@ -5,6 +5,11 @@ import pandas as pd
 from utils.agent import Agent
 from utils.dataframe import ReadDf
 from utils.arguments import ActiveCryptos
+from utils.transformers import Labeler
+from utils.indicators import RSI, BLG, ATR, ADX, DailyLogReturn, SMA, SMA_DIFF, MACD, Z_SCORE, HL_Ratio, VolumeRatio, SwingLabeler
+
+
+from sklearn.pipeline import Pipeline
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -22,22 +27,56 @@ if __name__ == '__main__':
         args = Parsing()
 
         for crypto in ActiveCryptos():
-            agent = Agent(crypto, crossval=args.crossval)
-#            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_1m.csv')
-            dataframe = ReadDf(f'data/crypto/{crypto}/1m/{crypto}_23-24.csv')
-#            dataframe = pd.read_csv(f'data/crypto/{crypto}/1m/{crypto}_preprocessed.csv')
+            agent = Agent(features=[
+                'LOG_RTN',
+                'SMA5',
+                'SMA20',
+                'SMA_DIFF_5_20',
+                'MACD_LINE',
+                'MACD_SIGNAL',
+                'BLG_WIDTH',
+                'ATR14',
+                'RSI14',
+                'ADX14',
+                'Z_SCORE_close',
+                'HL_Ratio',
+                'Volume_Ratio_20'
+            ], crossval=args.crossval)
             
-#            dataframe = dataframe[(dataframe['DATETIME'] >= '2020-01-01') & (dataframe['DATETIME'] <= '2024-12-10')]
-#            dataframe = dataframe.reset_index(drop=True)
-            dataframe = dataframe[len(dataframe) - 5000:].reset_index(drop=True)
-            
+            dataframe = pd.read_csv(f'data/crypto/BTCUSDT/1d/BTCUSDT_1d.csv')
+            preprocess = Pipeline([
+                ('Daily log rtn', DailyLogReturn()),#
+                ('SMA 5', SMA(5)),#
+                ('SMA 20', SMA(20)),#
+                ('SMA DIFF', SMA_DIFF(5, 20)),#
+                ('MACD', MACD(12, 26, 9)),#
+                ('BLG WIDTH', BLG(20, 20)),
+                ('ATR 14', ATR(14)),
+                ('RSI 14', RSI(14)),
+                ('ADX 14', ADX(14)),
+                ('Z_score', Z_SCORE(20, 'close')),
+                ('Ratio H_L', HL_Ratio()),
+                ('Volume ratio', VolumeRatio(20)),
+                ('Labeler', SwingLabeler(risk=0.5, profit=1, lifespan=1)),
+            ])
+            dataframe = preprocess.fit_transform(dataframe)
+            breakpoint()
+            dataframe = dataframe[26:]
+            df_train = dataframe[:int(len(dataframe) * 0.8)]
+            df_test = dataframe[int(len(dataframe) * 0.8):].reset_index(drop=True)
+
+            df_train.to_csv('df_train.csv', index=False)
+            df_test.to_csv('df_test.csv', index=False)
+
             logging.info(f'Training {crypto} agent')
-            agent.train(dataframe.copy())
+            agent.train(df_train)
             logging.info(f'Agent {crypto} trained successfully')
 
             logging.info("Saving agent")
-            agent.save()
+            agent.save(f'data/agents/{crypto}_models.pkl', f'data/agents/scalers/{crypto}_scaler.pkl')
             logging.info(f'Agent {crypto} saved successfully')
+
+            agent.predict_validate(df_test)
 
     except Exception as error:
         logging.error("Error: %s", error, exc_info=True)

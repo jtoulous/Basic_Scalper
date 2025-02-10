@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import logging
+import pickle
 
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -25,35 +26,68 @@ class   Cleaner(BaseEstimator, TransformerMixin):
         return X
 
 
+#class   Scaler(BaseEstimator, TransformerMixin):
+#    def __init__(self, columns, action='init', path=None):
+#        self.columns = columns
+#        self.action = action
+#        self.path = path
+#        self.inited = 0 if action == 'init' else 1
+#        self.scaler = StandardScaler() if action == 'init' else joblib.load(path)
+#
+#    def fit(self, X, y=None):
+#        return self
+#
+#    def transform(self, X, y=None):
+#        logging.info("Scaling...")
+#
+#        X_scaled = X[self.columns]
+#        
+#        if self.inited == 0 and self.action == 'init':
+#            X_scaled = self.scaler.fit_transform(X_scaled)
+#            self.inited = 1
+#        else:
+#            X_scaled = self.scaler.transform(X_scaled)
+#        
+#        X[self.columns] = X_scaled
+#        
+#        if self.action == 'init' and self.path is not None:
+#            joblib.dump(self.scaler, self.path)
+#
+#        logging.info("Scaling successful")
+#        return X
+#
+
+
 class   Scaler(BaseEstimator, TransformerMixin):
-    def __init__(self, columns, action='init', path=None):
+    def __init__(self, columns, load_file=None):
         self.columns = columns
-        self.action = action
-        self.path = path
-        self.inited = 0 if action == 'init' else 1
-        self.scaler = StandardScaler() if action == 'init' else joblib.load(path)
+        if load_file is None:
+            self.scaler = StandardScaler()
+        else:
+            with open(load_file, 'rb') as file:
+                self.scaler = pickle.load(file)
+        self.fitted = 0 if load_file is None else 1
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
         logging.info("Scaling...")
-
         X_scaled = X[self.columns]
         
-        if self.inited == 0 and self.action == 'init':
+        if self.fitted == 0:
+            breakpoint()
             X_scaled = self.scaler.fit_transform(X_scaled)
-            self.inited = 1
+            self.fitted = 1
         else:
+            breakpoint()
             X_scaled = self.scaler.transform(X_scaled)
         
         X[self.columns] = X_scaled
         
-        if self.action == 'init' and self.path is not None:
-            joblib.dump(self.scaler, self.path)
-
         logging.info("Scaling successful")
         return X
+
 
 
 class   RowSelector(BaseEstimator, TransformerMixin):
@@ -156,7 +190,7 @@ class BinSampler(BaseEstimator, TransformerMixin):
             balanced_data.append(bin_data)
 
         balanced_df = pd.concat(balanced_data, axis=0).drop(columns=['BIN']).reset_index(drop=True)
-        balanced_df = balanced_df.sort_values(by='DATETIME')
+        balanced_df = balanced_df.sort_values(by='timestamp')
         balanced_df = balanced_df.reset_index(drop=True)
         return balanced_df
 
@@ -173,18 +207,18 @@ class Labeler(BaseEstimator, TransformerMixin):   # 0 for Win, 1 for Lose
     def transform(self, X, y=None):
         logging.info("Labelling...")
         X['LABEL'] = 1
-#        X['TAKE_PROFIT'] = X['CLOSE'] * (1 + self.profit)
-#        X['STOP_LOSS'] = X['CLOSE'] * (1 - self.risk)
-        X = X.sort_values(by='DATETIME')
+#        X['TAKE_PROFIT'] = X['close'] * (1 + self.profit)
+#        X['STOP_LOSS'] = X['close'] * (1 - self.risk)
+        X = X.sort_values(by='timestamp')
 
         for idx in range(1, len(X)):
-            stop_loss = X['CLOSE'].iloc[idx] * (1 - self.risk)
-            take_profit = X['CLOSE'].iloc[idx] * (1 + self.profit)
+            stop_loss = X['close'].iloc[idx] * (1 - self.risk)
+            take_profit = X['close'].iloc[idx] * (1 + self.profit)
 
             end_idx = min(idx + self.lifespan, len(X))
             for j in range(idx + 1, end_idx):
-                open_price = X['OPEN'].iloc[j]
-                close_price = X['CLOSE'].iloc[j]
+                open_price = X['open'].iloc[j]
+                close_price = X['close'].iloc[j]
 
                 if open_price <= stop_loss:
                     X.loc[idx, 'LABEL'] = 1

@@ -2,94 +2,117 @@ import pandas as pd
 import xgboost as xgb
 import joblib
 import logging
+import pickle
+from colorama import Fore, Style
 
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 from utils.indicators import RSI, BLG
 from utils.transformers import Labeler, Scaler, BalancedOverSampler, UnbalancedSampler
 from utils.tools import CrossVal
 
-from sklearn.ensemble import RandomForestClassifier
 
 
 class Agent():
-    def __init__(self, crypto, load=False, crossval=False):
-        self.features = ['RSI14', 'U-BAND', 'L-BAND']
-        self.crypto = crypto
+    def __init__(self, features, load_file=None, scaler_file=None, crossval=False):
+        self.features = features
         self.crossval = crossval
         self.models = {}
-        self.scaler = Scaler(self.features, action='init', path=f'data/agents/scalers/{crypto}_scaler.pkl') if load is False else Scaler(self.features, action='load', path=f'data/agents/scalers/{crypto}_scaler.pkl')
 
-        if load is False:
+        if load_file is None:
+#            self.scaler = Scaler(self.features)
+            self.scaler = StandardScaler()
+
+
+#            self.models['MLP_Balanced'] = LogisticRegression(
+#                solver='liblinear', 
+#                random_state=42,
+#                max_iter=500
+#            )
+
             self.models['MLP_Balanced'] = MLPClassifier(
-                hidden_layer_sizes=(32, 16),
+                hidden_layer_sizes=(128, 64, 32),
                 activation='relu',
                 solver='adam',
+                alpha=0.0001,
+                learning_rate='adaptive',
+                max_iter=1000,
+                early_stopping=True,
                 random_state=42,
-                max_iter=500
+                batch_size=32
             )
 
-            self.models['MLP_Unbalanced_0'] = MLPClassifier(
-                hidden_layer_sizes=(32, 16),
-                activation='relu',
-                solver='adam',
-                random_state=42,
-                max_iter=500
-            )
-
-            self.models['MLP_Unbalanced_1'] = MLPClassifier(
-                hidden_layer_sizes=(32, 16),
-                activation='relu',
-                solver='adam',
-                random_state=42,
-                max_iter=500
-            )
-
-            self.models['MLP_Master'] = MLPClassifier(
-                hidden_layer_sizes=(64, 32),
-                activation='relu',
-                solver='adam',
-                random_state=42,
-                max_iter=1000
-            )
+#            self.models['MLP_Unbalanced_0'] = MLPClassifier(
+#                hidden_layer_sizes=(128, 64, 32),
+#                activation='relu',
+#                solver='adam',
+#                alpha=0.0001,
+#                learning_rate='adaptive',
+#                max_iter=1000,
+#                early_stopping=True,
+#                random_state=42,
+#                batch_size=32
+#            )
+#
+#            self.models['MLP_Unbalanced_1'] = MLPClassifier(
+#                hidden_layer_sizes=(128, 64, 32),
+#                activation='relu',
+#                solver='adam',
+#                alpha=0.0001,
+#                learning_rate='adaptive',
+#                max_iter=1000,
+#                early_stopping=True,
+#                random_state=42,
+#                batch_size=32
+#            )
+#
+#            self.models['MLP_Master'] = MLPClassifier(
+#                hidden_layer_sizes=(128, 64, 32),
+#                activation='relu',
+#                solver='adam',
+#                alpha=0.0001,
+#                learning_rate='adaptive',
+#                max_iter=1000,
+#                early_stopping=True,
+#                random_state=42,
+#                batch_size=32
+#            )
 
         else:
-            self.models['MLP_Balanced'] = joblib.load(f'data/agents/{crypto}_balanced.pkl')
-            self.models['MLP_Unbalanced_0'] = joblib.load(f'data/agents/{crypto}_unbalanced_0.pkl')
-            self.models['MLP_Unbalanced_1'] = joblib.load(f'data/agents/{crypto}_unbalanced_1.pkl')
-            self.models['MLP_Master'] = joblib.load(f'data/agents/{crypto}_master.pkl')
+            with open(load_file, 'rb') as file:
+                self.models = pickle.load(file)
+            with open(scaler_file, 'rb') as file:
+                self.scaler = pickle.load(file)
 
 
     def train(self, dataframe):#Fine tuner le modele sur les 3-4 dernieres annees a la fin
-        preprocess = Pipeline([
-            ('RSI', RSI(14)),
-            ('BLG', BLG(20, 2)),
-            ('Labeler', Labeler(risk=0.001, profit=0.002, lifespan=10)),
-            ('Scaler', self.scaler),
-        ])
-
-        logging.info(f'Starting {self.crypto} preprocessing')
-        dataframe = preprocess.fit_transform(dataframe)
-        logging.info("Preprocessing completed")
+        dataframe = dataframe.copy()
+        
+        logging.info(f'Scaling data')
+        dataframe[self.features] = self.scaler.fit_transform(dataframe[self.features])
+        logging.info("Scaling completed")
 
         self.train_balanced(dataframe.copy())
-        self.train_unbalanced(dataframe.copy(), 0)
-        self.train_unbalanced(dataframe.copy(), 1)
+#        self.train_unbalanced(dataframe.copy(), 0)
+#        self.train_unbalanced(dataframe.copy(), 1)
 
-        df_master = self.combine_predictions(dataframe[self.features])
-        df_master['LABEL'] = dataframe['LABEL']
-        df_master = df_master.sample(frac=1).reset_index(drop=True)
+#        df_master = self.combine_predictions(dataframe[self.features])
+#        df_master['LABEL'] = dataframe['LABEL']
+#        df_master = df_master.sample(frac=1).reset_index(drop=True)
         
-        X_master = df_master[['PRED_1', 'PRED_2', 'PRED_3']]
-        y_master = dataframe['LABEL']
-        if self.crossval is True:
-            logging.info(f'crossval Master...')
-            CrossVal(self.models['MLP_Master'], X_master, y_master)
+#        X_master = df_master[['PRED_1', 'PRED_2', 'PRED_3']]
+#        y_master = dataframe['LABEL']
+#        if self.crossval is True:
+#            logging.info(f'crossval Master...')
+#            CrossVal(self.models['MLP_Master'], X_master, y_master)
 
-        logging.info(f'Training Master...')
-        self.models['MLP_Master'].fit(X_master, y_master)
-        logging.info(f'Training successful')
+#        logging.info(f'Training Master...')
+#        self.models['MLP_Master'].fit(X_master, y_master)
+#        logging.info(f'Training successful')
 
 
     def train_balanced(self, dataframe):
@@ -120,31 +143,44 @@ class Agent():
         self.models[f'MLP_Unbalanced_{b_type}'].fit(X, y)
 
 
-
     def predict(self, dataframe):
-            preprocess = Pipeline([
-                ('RSI', RSI(14)),
-                ('BLG', BLG(20, 2)),
-                ('Scaler', self.scaler),
-            ])
-            dataframe = preprocess.transform(dataframe)
-            X = dataframe[self.features]
+            dataframe = dataframe.copy()
+            dataframe[self.features] = self.scaler.transform(dataframe[self.features])
+#            X_master = self.combine_predictions(dataframe[self.features])
 
-            prediction = self.models['MLP_Balanced'].predict(X)
+#            prediction = self.models['MLP_Master'].predict(X_master)
+            prediction = self.models['MLP_Balanced'].predict(dataframe[self.features])
             return prediction
 
 
-
-
     def predict_validate(self, dataframe):
-        preprocess = Pipeline([
-            ('RSI', RSI(14)),
-            ('BLG', BLG(20, 2)),
-            ('Scaler', self.scaler),
-        ])
-        dataframe
+        dataframe = dataframe.copy()
+        dataframe[self.features] = self.scaler.transform(dataframe[self.features])
+#        X_master = self.combine_predictions(dataframe[self.features])
+#        predictions = self.models['MLP_Master'].predict(X_master)
+        predictions = self.models['MLP_Balanced'].predict(dataframe[self.features])
 
-
+        nb_correct_preds = 0
+        nb_uncorrect_preds = 0
+        nb_win_preds = 0
+        nb_true_win = 0
+        for idx, row in dataframe[['LABEL']].iterrows():
+            pred = predictions[idx]
+            if pred == row['LABEL']:
+                nb_correct_preds = nb_correct_preds + 1
+                print(f'{Fore.GREEN}{row['LABEL']}  ==>  {pred}{Style.RESET_ALL}')
+            else:
+                print(f'{Fore.RED}{row['LABEL']}  ==>  {pred}{Style.RESET_ALL}')
+            
+            if pred == 0:
+                nb_win_preds = nb_win_preds + 1
+                if row['LABEL'] == 0:
+                    nb_true_win = nb_true_win + 1
+        
+        if nb_win_preds > 0:
+            print(f'Validation result:\n - {(nb_correct_preds / len(dataframe) * 100):.2f}% correct predictions\n - {(nb_true_win / nb_win_preds * 100):.2f}%({nb_true_win}/{nb_win_preds}) true wins')
+        else:
+            print(f'Validation result:\n  - {(nb_correct_preds / len(dataframe)) * 100}% correct predictions')
 
 
     def combine_predictions(self, X):
@@ -155,8 +191,9 @@ class Agent():
         return X_master
 
 
-    def save(self):
-        joblib.dump(self.models['MLP_Balanced'], f'data/agents/{self.crypto}_balanced.pkl')
-        joblib.dump(self.models['MLP_Unbalanced_0'], f'data/agents/{self.crypto}_unbalanced_0.pkl')
-        joblib.dump(self.models['MLP_Unbalanced_1'], f'data/agents/{self.crypto}_unbalanced_1.pkl')
-        joblib.dump(self.models['MLP_Master'], f'data/agents/{self.crypto}_master.pkl')
+    def save(self, models_path, scaler_path):
+        with open(models_path, 'wb') as file:
+            pickle.dump(self.models, file)
+
+        with open(scaler_path, 'wb') as file:
+            pickle.dump(self.scaler, file)

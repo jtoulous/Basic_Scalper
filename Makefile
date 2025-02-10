@@ -18,8 +18,8 @@ install:
 
 reset:
 	@echo "$(GREEN) ===> resetting models..."
-	@rm -f core/agents/trained/*.pkl
-	@rm -f core/agents/scalers/*.pkl
+	@rm -f core/data/agents/*.pkl
+	@rm -f core/data/agents/scalers/*.pkl
 	@echo " ===> Done.$(RESET)"
 
 clean:

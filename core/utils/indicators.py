@@ -14,7 +14,7 @@ class DateToFeature(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['DAY'] = X['DATETIME'].dt.dayofweek + 1
+        X['DAY'] = X['timestamp'].dt.dayofweek + 1
         X['DAY'] = X['DAY'].astype(float)
         return X
 
@@ -31,10 +31,10 @@ class TR(BaseEstimator, TransformerMixin):
 
         for idx, row in X.iterrows():
             if idx == 0:
-                X.loc[idx, 'TR'] = row['HIGH'] - row['LOW']
+                X.loc[idx, 'TR'] = row['high'] - row['low']
 
             else:
-                X.loc[idx, 'TR'] = max(row['HIGH'] - row['LOW'], abs(row['HIGH'] - prev_row['CLOSE']), abs(row['LOW'] - prev_row['CLOSE']))
+                X.loc[idx, 'TR'] = max(row['high'] - row['low'], abs(row['high'] - prev_row['close']), abs(row['low'] - prev_row['close']))
             prev_row = row
         return X
 
@@ -47,7 +47,7 @@ class PriceRange(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['PR'] = X['HIGH'] - X['LOW']
+        X['PR'] = X['high'] - X['low']
         return X
 
 
@@ -60,22 +60,24 @@ class ATR(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         tr = []
-        prev_row = None
+        prev_close = None
 
         for idx, row in X.iterrows():
             if idx == 0:
-                tr_val = row['HIGH'] - row['LOW']
+                tr_val = row['high'] - row['low']
             else:
-                tr_val = max(row['HIGH'] - row['LOW'], abs(row['HIGH'] - prev_row['CLOSE']), abs(row['LOW'] - prev_row['CLOSE']))
+                tr_val = max(row['high'] - row['low'],
+                             abs(row['high'] - prev_close),
+                             abs(row['low'] - prev_close))
             tr.append(tr_val)
-            prev_row = row
+            prev_close = row['close']
 
-        tr = pd.Series(tr)
-        X[f'ATR{str(self.periods)}'] = tr.rolling(window=self.periods, min_periods=1).mean()
-        return X
+        tr_series = pd.Series(tr, index=X.index)
+        X[f'ATR{self.periods}'] = tr_series.rolling(window=self.periods, min_periods=1).mean()
+        return X.dropna().reset_index(drop=True)
 
 
-class ADX():
+class ADX(BaseEstimator, TransformerMixin):
     def __init__(self, periods):
         self.periods = periods
 
@@ -83,28 +85,33 @@ class ADX():
         return self
 
     def transform(self, X, y=None):
-        X['H-L_TMP'] = X['HIGH'] - X['LOW']
-        X['H-Close_TMP'] = abs(X['HIGH'] - X['CLOSE'].shift())
-        X['L-Close_TMP'] = abs(X['LOW'] - X['CLOSE'].shift())
+        X['H-L_TMP'] = X['high'] - X['low']
+        X['H-Close_TMP'] = abs(X['high'] - X['close'].shift(1))
+        X['L-Close_TMP'] = abs(X['low'] - X['close'].shift(1))
         X['TR_TMP'] = X[['H-L_TMP', 'H-Close_TMP', 'L-Close_TMP']].max(axis=1)
 
-        X['+DM_TMP'] = X['HIGH'].diff()
-        X['-DM_TMP'] = -X['LOW'].diff()
+        delta_high = X['high'].diff(1)
+        delta_low = X['low'].diff(1)
+        X['+DM_TMP'] = np.where((delta_high > delta_low) & (delta_high > 0), delta_high, 0)
+        X['-DM_TMP'] = np.where((delta_low > delta_high) & (delta_low > 0), -delta_low, 0)
 
-        X['+DM_TMP'] = X['+DM_TMP'].where(X['+DM_TMP'] > 0, 0)
-        X['-DM_TMP'] = X['-DM_TMP'].where(X['-DM_TMP'] > 0, 0)
-
-        X['+DM_avg_TMP'] = X['+DM_TMP'].rolling(window=self.periods).mean()
-        X['-DM_avg_TMP'] = X['-DM_TMP'].rolling(window=self.periods).mean()
-        X['TR_avg_TMP'] = X['TR_TMP'].rolling(window=self.periods).mean()
+        X['+DM_avg_TMP'] = X['+DM_TMP'].rolling(window=self.periods, min_periods=1).mean()
+        X['-DM_avg_TMP'] = X['-DM_TMP'].rolling(window=self.periods, min_periods=1).mean()
+        X['TR_avg_TMP']    = X['TR_TMP'].rolling(window=self.periods, min_periods=1).mean()
 
         X['+DI'] = 100 * X['+DM_avg_TMP'] / X['TR_avg_TMP']
         X['-DI'] = 100 * X['-DM_avg_TMP'] / X['TR_avg_TMP']
 
-        X[f'ADX{self.periods}'] = 100 * (abs(X['+DI'] - X['-DI']) / (X['+DI'] + X['-DI'])).rolling(window=self.periods).mean()
+        DX = 100 * (abs(X['+DI'] - X['-DI']) / (X['+DI'] + X['-DI']))
+        X[f'ADX{self.periods}'] = DX.rolling(window=self.periods, min_periods=1).mean()
 
-        X.drop(columns=['H-L_TMP', 'H-Close_TMP', 'L-Close_TMP', 'TR_TMP', '+DM_TMP', '-DM_TMP', '+DM_avg_TMP', '-DM_avg_TMP', 'TR_avg_TMP', '+DI', '-DI'], inplace=True)
-        return X     
+        X.drop(columns=[
+            'H-L_TMP', 'H-Close_TMP', 'L-Close_TMP', 'TR_TMP',
+            '+DM_TMP', '-DM_TMP', '+DM_avg_TMP', '-DM_avg_TMP',
+            'TR_avg_TMP', '+DI', '-DI'
+        ], inplace=True)
+        
+        return X.dropna().reset_index(drop=True)
 
 
 
@@ -116,7 +123,7 @@ class EMA(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):    
-        X[f'EMA{str(self.periods)}'] = X['CLOSE'].ewm(span=self.periods, adjust=False).mean()
+        X[f'EMA{str(self.periods)}'] = X['close'].ewm(span=self.periods, adjust=False).mean()
         return X
 
 
@@ -154,18 +161,24 @@ class RSI(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        delta = X['CLOSE'].diff(1)
-        gain = (delta.where(delta > 0, 0)).fillna(0)
-        loss = (delta.where(delta < 0, 0)).fillna(0)
-        loss = -loss
-
+        delta = X['close'].diff(1)
+        
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        
         avg_gain = gain.rolling(window=self.periods, min_periods=1).mean()
         avg_loss = loss.rolling(window=self.periods, min_periods=1).mean()
+        
         rs = avg_gain / avg_loss
+        
         rsi = 100 - (100 / (1 + rs))
-
-        X[f'RSI{str(self.periods)}'] = rsi.bfill()
-        return X
+        
+        rsi = rsi.mask((avg_loss == 0) & (avg_gain == 0), 50)
+        rsi = rsi.mask((avg_loss == 0) & (avg_gain != 0), 100)
+        
+        X[f'RSI{self.periods}'] = rsi
+        
+        return X.dropna().reset_index(drop=True)
 
 
 class STO(BaseEstimator, TransformerMixin):
@@ -179,9 +192,9 @@ class STO(BaseEstimator, TransformerMixin):
         k_periods = self.periods[0]
         d_periods = self.periods[1]
 
-        low_min = X['LOW'].rolling(window=k_periods, min_periods=1).min()
-        high_max = X['HIGH'].rolling(window=k_periods,min_periods=1).max()
-        K = ((X['CLOSE'] - low_min) / (high_max - low_min)) * 100
+        low_min = X['low'].rolling(window=k_periods, min_periods=1).min()
+        high_max = X['high'].rolling(window=k_periods,min_periods=1).max()
+        K = ((X['close'] - low_min) / (high_max - low_min)) * 100
         D = K.rolling(window=d_periods, min_periods=1).mean()
 
         X['K(sto)'] = K.bfill()
@@ -197,9 +210,9 @@ class SMA(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['SMA'] = X['CLOSE'].rolling(window=self.periods, min_periods=1).mean()
-        X['SMA'] = X['SMA'].bfill()
-        return X
+        X[f'SMA{self.periods}'] = np.nan
+        X[f'SMA{self.periods}'] = X['close'].rolling(window=self.periods, min_periods=self.periods).mean()
+        return X.dropna().reset_index(drop=True)
 
 
 class SMA_DIFF(BaseEstimator, TransformerMixin):
@@ -211,11 +224,11 @@ class SMA_DIFF(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['tmp_sma_1'] = X['CLOSE'].rolling(window=self.period_1, min_periods=1).mean()
-        X['tmp_sma_2'] = X['CLOSE'].rolling(window=self.period_2, min_periods=1).mean()
+        X['tmp_sma_1'] = X['close'].rolling(window=self.period_1, min_periods=1).mean()
+        X['tmp_sma_2'] = X['close'].rolling(window=self.period_2, min_periods=1).mean()
         X[f'SMA_DIFF_{self.period_1}_{self.period_2}'] = X['tmp_sma_1'] - X['tmp_sma_2']
         X.drop(columns=['tmp_sma_1', 'tmp_sma_2'], inplace=True)
-        return X
+        return X.dropna().reset_index(drop=True)
 
 
 
@@ -228,7 +241,7 @@ class WMA(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         weights = pd.Series(np.arange(1, self.periods + 1) / np.sum(np.arange(1, self.periods + 1)))
-        weighted_close = X['CLOSE'].rolling(window=self.periods).apply(lambda x: (x * weights).sum(), raw=True)
+        weighted_close = X['close'].rolling(window=self.periods).apply(lambda x: (x * weights).sum(), raw=True)
         X['WMA'] = weighted_close.bfill()
         return X
 
@@ -247,13 +260,13 @@ class DMI(BaseEstimator, TransformerMixin):
 
         for idx, row in X.iterrows():
             if prev_row is not None:
-                dm_plus_val = row['HIGH'] - prev_row['HIGH'] \
-                                if row['HIGH'] - prev_row['HIGH'] > prev_row['LOW'] - row['LOW'] \
-                                and row['HIGH'] - prev_row['HIGH'] > 0 \
+                dm_plus_val = row['high'] - prev_row['high'] \
+                                if row['high'] - prev_row['high'] > prev_row['low'] - row['low'] \
+                                and row['high'] - prev_row['high'] > 0 \
                                 else 0
-                dm_minus_val = prev_row['LOW'] - row['LOW'] \
-                                if prev_row['LOW'] - row['LOW'] > row['HIGH'] - prev_row['HIGH'] \
-                                and prev_row['LOW'] - row['LOW'] > 0 \
+                dm_minus_val = prev_row['low'] - row['low'] \
+                                if prev_row['low'] - row['low'] > row['high'] - prev_row['high'] \
+                                and prev_row['low'] - row['low'] > 0 \
                                 else 0
             else:
                 dm_plus_val = 0
@@ -276,63 +289,52 @@ class DMI(BaseEstimator, TransformerMixin):
 
 
 class BLG(BaseEstimator, TransformerMixin):
-    def __init__(self, periods, num_std_dev, live=False):
+    def __init__(self, periods, num_std_dev):
         self.periods = periods
         self.num_std_dev = num_std_dev
-        self.live = live
-
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        if self.live is False:
-            TMP_SMA = X['CLOSE'].rolling(window=self.periods, min_periods=1).mean()
-            TMP_STD = X['CLOSE'].rolling(window=self.periods, min_periods=1).std()
-            u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
-            l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
+        TMP_SMA = X['close'].rolling(window=self.periods, min_periods=1).mean()
+        TMP_STD = X['close'].rolling(window=self.periods, min_periods=1).std()
+        
+        u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
+        l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
+        
+        X['U-BAND'] = u_band
+        X['L-BAND'] = l_band
+        X['BLG_WIDTH'] = u_band - l_band
 
-            X['U-BAND'] = u_band.bfill().ffill()
-            X['L-BAND'] = l_band.bfill().ffill()
-            X['BLG_WIDTH'] = (X['U-BAND'] - X['L-BAND'])
-
-        else:
-            for i in range(1, len(X)):
-                if pd.isna(X.loc[i, 'U-BAND']) or pd.isna(X.loc[i, 'L-BAND']):
-                    TMP_SMA = X['CLOSE'].iloc[max(i - self.periods + 1, 0):i+1].mean()
-                    TMP_STD = X['CLOSE'].iloc[max(i - self.periods + 1, 0):i+1].std()
-                    u_band = TMP_SMA + (TMP_STD * self.num_std_dev)
-                    l_band = TMP_SMA - (TMP_STD * self.num_std_dev)
-
-                    X.loc[i, 'U-BAND'] = u_band
-                    X.loc[i, 'L-BAND'] = l_band
-                    X.loc[i, 'BLG_WIDTH'] = u_band - l_band
-
-        return X
+        return X.dropna().reset_index(drop=True)
 
 
 class MACD(BaseEstimator, TransformerMixin):
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, ema_short, ema_long, ema_signal):
+        self.ema_short = ema_short
+        self.ema_long = ema_long
+        self.ema_signal = ema_signal
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        short_period = self.args[0]
-        long_period = self.args[1]
-        signal_period = self.args[2]
+        short_period = self.ema_short
+        long_period = self.ema_long
+        signal_period = self.ema_signal
 
-        ema_short = X['CLOSE'].rolling(window=short_period, min_periods=1).mean()
-        ema_long = X['CLOSE'].rolling(window=long_period, min_periods=1).mean()
+        ema_short = X['close'].ewm(span=short_period, adjust=False, min_periods=short_period).mean()
+        ema_long = X['close'].ewm(span=long_period, adjust=False, min_periods=long_period).mean()
         macd_line = ema_short - ema_long
-        macd_signal = macd_line.ewm(span=signal_period, min_periods=1).mean()
+        macd_signal = macd_line.ewm(span=signal_period, adjust=False, min_periods=signal_period).mean()
         macd_histo = macd_line - macd_signal
 
-        X['MACD_LINE'] = macd_line.bfill()
-        X['MACD_SIGNAL'] = macd_signal.bfill()
-        X['MACD_HISTO'] = macd_histo.bfill()
-        return X
+        X['MACD_LINE'] = macd_line
+        X['MACD_SIGNAL'] = macd_signal
+        X['MACD_HISTO'] = macd_histo
+
+        return X.dropna().reset_index(drop=True)
 
 
 class HilbertsTransform(BaseEstimator, TransformerMixin):
@@ -343,7 +345,7 @@ class HilbertsTransform(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):    
-        analytic_signal = hilbert(X['CLOSE'])
+        analytic_signal = hilbert(X['close'])
         X['HBT_TRANS'] = analytic_signal.imag
         X['HBT_TRANS'] = X['HBT_TRANS'].bfill()
         return X
@@ -357,7 +359,7 @@ class CCI(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        TP = (X['HIGH'] + X['LOW'] + X['CLOSE']) / 3
+        TP = (X['high'] + X['low'] + X['close']) / 3
         SMA_TP = TP.rolling(window=self.periods, min_periods=1).mean()
         MD = TP.rolling(window=self.periods, min_periods=1).apply(lambda x: np.mean(np.abs(x - np.mean(x))))
 
@@ -378,8 +380,8 @@ class PPO(BaseEstimator, TransformerMixin):
         long_period = self.periods[1]
         signal_period = self.periods[2]
 
-        short_ema = X['CLOSE'].ewm(span=short_period, min_periods=1).mean()
-        long_ema = X['CLOSE'].ewm(span=long_period, min_periods=1).mean()
+        short_ema = X['close'].ewm(span=short_period, min_periods=1).mean()
+        long_ema = X['close'].ewm(span=long_period, min_periods=1).mean()
         ppo_line = ((short_ema - long_ema) / long_ema) * 100
         signal_line = ppo_line.ewm(span=signal_period, min_periods=1).mean()
 
@@ -396,7 +398,7 @@ class ROC(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['ROC'] = X['CLOSE'].pct_change()
+        X['ROC'] = X['close'].pct_change()
         X['ROC'] = X['ROC'].bfill()
         return X
 
@@ -413,7 +415,7 @@ class Slope(BaseEstimator, TransformerMixin):
         slopes = []
 
         for i in range(self.periods, len(X)):
-            y_vals = X['CLOSE'].iloc[i - self.periods:i]
+            y_vals = X['close'].iloc[i - self.periods:i]
             x_vals = range(self.periods)
             slope, intercept = np.polyfit(x_vals, y_vals, 1)
             slopes.append(slope)
@@ -424,7 +426,8 @@ class Slope(BaseEstimator, TransformerMixin):
 
 
 
-class   Z_SCORE(BaseEstimator, TransformerMixin):
+
+class Z_SCORE(BaseEstimator, TransformerMixin):
     def __init__(self, periods, column):
         self.periods = periods
         self.column = column
@@ -437,7 +440,7 @@ class   Z_SCORE(BaseEstimator, TransformerMixin):
         col_std = X[self.column].rolling(window=self.periods, min_periods=1).std()
 
         X[f'Z_SCORE_{self.column}'] = (X[self.column] - col_mean) / col_std
-        return X
+        return X.dropna().reset_index(drop=True)
 
 
 class   Growth(BaseEstimator, TransformerMixin):
@@ -448,7 +451,7 @@ class   Growth(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['GROWTH'] = (X['CLOSE'] - X['OPEN']) / X['OPEN'] * 100
+        X['GROWTH'] = (X['close'] - X['volume']) / X['volume'] * 100
         return X
 
 
@@ -460,7 +463,7 @@ class HV(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['log_returns'] = np.log(X['CLOSE'] / X['CLOSE'].shift(1))
+        X['log_returns'] = np.log(X['close'] / X['close'].shift(1))
         X[f'HV{self.periods}'] = X['log_returns'].rolling(window=self.periods).std()
         
         X.drop(columns=['log_returns'], inplace=True)
@@ -479,10 +482,10 @@ class OBV(BaseEstimator, TransformerMixin):
         X['OBV'] = np.nan
         
         for i in range(1, len(X)):
-            if X['CLOSE'].iloc[i] > X['CLOSE'].iloc[i - 1]:
-                X.loc[i, 'OBV'] = X['VOLUME'].iloc[i]
-            elif X['CLOSE'].iloc[i] < X['CLOSE'].iloc[i - 1]:
-                X.loc[i, 'OBV'] = -X['VOLUME'].iloc[i]
+            if X['close'].iloc[i] > X['close'].iloc[i - 1]:
+                X.loc[i, 'OBV'] = X['volume'].iloc[i]
+            elif X['close'].iloc[i] < X['close'].iloc[i - 1]:
+                X.loc[i, 'OBV'] = -X['volume'].iloc[i]
             else:
                 X.loc[i, 'OBV'] = 0
 
@@ -503,36 +506,15 @@ class CMF(BaseEstimator, TransformerMixin):
         X['CMF'] = np.nan
 
         for i in range(len(X)):
-            if X['HIGH'].iloc[i] != X['LOW'].iloc[i]:
-                money_flow_multiplier = ((X['CLOSE'].iloc[i] - X['LOW'].iloc[i]) - (X['HIGH'].iloc[i] - X['CLOSE'].iloc[i])) / (X['HIGH'].iloc[i] - X['LOW'].iloc[i])
-                money_flow_volume = money_flow_multiplier * X['VOLUME'].iloc[i]
+            if X['high'].iloc[i] != X['low'].iloc[i]:
+                money_flow_multiplier = ((X['close'].iloc[i] - X['low'].iloc[i]) - (X['high'].iloc[i] - X['close'].iloc[i])) / (X['high'].iloc[i] - X['low'].iloc[i])
+                money_flow_volume = money_flow_multiplier * X['volume'].iloc[i]
                 X.loc[i, 'CMF'] = money_flow_volume
 
-        X['CMF'] = X['CMF'].rolling(window=self.periods, min_periods=1).sum() / X['VOLUME'].rolling(window=self.periods, min_periods=1).sum()
+        X['CMF'] = X['CMF'].rolling(window=self.periods, min_periods=1).sum() / X['volume'].rolling(window=self.periods, min_periods=1).sum()
         X = X.dropna(subset=['CMF']).reset_index(drop=True)
 
         return X
-
-
-class AmplitudeMax(BaseEstimator, TransformerMixin):######  ICI
-    def __init__(self, period):
-        self.period = period
-
-    def fit(self, X, y=None):
-        return self
-
-#    def transform(self, X, y=None):
-#        X[f'AMP{self.period}'] = (
-#            X['HIGH'].rolling(window=self.period, min_periods=1).max() -
-#            X['LOW'].rolling(window=self.period, min_periods=1).min()
-#        )
-#        for i in range(self.period + 1, len(X)):
-#            max_high = X['HIGH'].iloc[i]
-#            min_low = X['LOW'].iloc[i]
-#            for j in range(i - self.period, i):
-#                
-#        return X
-
 
 
 class RealizedVolatility(BaseEstimator, TransformerMixin):
@@ -543,19 +525,19 @@ class RealizedVolatility(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X[f'VOLATILITY_{self.periods}'] = np.nan
+        X[f'VOLATILITY{self.periods}'] = np.nan
         X[f'log_returns'] = np.nan
         
-        X['log_returns'] = np.log(X['CLOSE'] / X['CLOSE'].shift(1))
-        X[f'VOLATILITY_{self.periods}'] = X['log_returns'].rolling(window=self.periods).std() * np.sqrt(self.periods)
+        X['log_returns'] = np.log(X['close'] / X['close'].shift(1))
+        X[f'VOLATILITY{self.periods}'] = X['log_returns'].rolling(window=self.periods).std() * np.sqrt(self.periods)
         X.drop(columns=['log_returns'], inplace=True)
         
-        X = X.dropna(subset=[f'VOLATILITY_{self.periods}']).reset_index(drop=True)
+        X = X.dropna(subset=[f'VOLATILITY{self.periods}']).reset_index(drop=True)
         return X
 
 
 
-class FeatureEngineering(BaseEstimator, TransformerMixin):
+class DailyLogReturn(BaseEstimator, TransformerMixin):
     def __init__(self):
         pass
 
@@ -563,11 +545,99 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        X['ATR_Lagged'] = X['ATR'].shift(1).bfill()
-        X['EMA_Lagged'] = X['EMA'].shift(1).bfill()
-    #    X['RSI_Lagged'] = X['RSI'].shift(1).bfill()
-    #    X['Momentum'] = X['CLOSE'] - X['CLOSE'].shift(1).bfill()
-        X['MACD_Difference'] = X['MACD_LINE'] - X['MACD_SIGNAL'].bfill()
-        X['BLG_WIDTH'] = X['U-BAND'] - X['L-BAND'].bfill()
-        X['EMA_SMA_Ratio'] = X['EMA'] / X['SMA'].bfill()
+        X['LOG_RTN'] = np.log(X['close'] / X['close'].shift(1))
+        X = X.dropna().reset_index(drop=True)
+        return X        
+
+
+
+
+class HL_Ratio(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X['HL_Ratio'] = (X['high'] - X['low']) / X['close']
+        return X.dropna().reset_index(drop=True)
+
+
+
+class VolumeRatio(BaseEstimator, TransformerMixin):
+    def __init__(self, periods):
+        self.periods = periods
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X[f'Volume_Ratio_{self.periods}'] = X['volume'] / X['volume'].rolling(window=self.periods, min_periods=1).mean()
+        return X.dropna().reset_index(drop=True)
+
+
+
+
+
+
+
+
+
+class SwingLabeler(BaseEstimator, TransformerMixin):   # 0 for Win, 1 for Lose, ATR must be calculated before hand
+    def __init__(self, risk=0.5, profit=1, lifespan=10):
+        self.risk = risk
+        self.profit = profit
+        self.lifespan = lifespan
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+#        logging.info("Labelling...")
+        X['LABEL'] = 1
+        X['TAKE_PROFIT'] = X['close'] + (X['ATR14'] * self.profit)
+        X['STOP_LOSS'] = X['close'] - (X['ATR14'] * self.risk)
+        X = X.sort_values(by='timestamp')
+
+        for idx in range(len(X) - 1):
+            tp = X.loc[X.index[idx], 'TAKE_PROFIT']
+            sl = X.loc[X.index[idx], 'STOP_LOSS']
+            label_set = False
+
+            for j in range(idx + 1, min(idx + self.lifespan, len(X))):
+                row = X.loc[X.index[j]]
+
+                if row['open'] >= tp:
+                    X.loc[X.index[idx], 'LABEL'] = 0
+                    label_set = True
+                    break
+                elif row['open'] <= sl:
+                    X.loc[X.index[idx], 'LABEL'] = 1
+                    label_set = True
+                    break
+
+                if row['high'] >= tp:
+                    X.loc[X.index[idx], 'LABEL'] = 0
+                    label_set = True
+                    break
+
+                if row['low'] <= sl:
+                    X.loc[X.index[idx], 'LABEL'] = 1
+                    label_set = True
+                    break
+
+                if row['close'] >= tp:
+                    X.loc[X.index[idx], 'LABEL'] = 0
+                    label_set = True
+                    break
+
+                if row['close'] <= sl:
+                    X.loc[X.index[idx], 'LABEL'] = 1
+                    label_set = True
+                    break
+
+            if not label_set:
+                X.loc[X.index[idx], 'LABEL'] = 1
+
         return X
